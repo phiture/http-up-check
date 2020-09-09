@@ -14,21 +14,20 @@ arg_parser.add_argument("-e", "--emails", required=True, help="comma separated l
 arg_parser.add_argument("-a", "--notify-always", action='store_true', help="when present, will send an email even if test was successful")
 args = vars(arg_parser.parse_args())
 url = args["url"]
+readable_url = url.split('://')[1]
 emails = args["emails"].split(",")
 notify_always = args["notify_always"]
 
-# Make the request
-response = requests.get(url)
-
-# Report on the results (email)
-email_subject = ""
-readable_url = url.split('://')[1]
-if response.status_code > 500:
-    email_subject = f"❌ {readable_url} is down"
-elif notify_always:
-    email_subject = f"✅ {readable_url} is up"
-if not email_subject:
-    exit()
+# Make the request and report on the results
+success = False
+try:
+    response = requests.get(url)
+    email_text = f"{url} returned a status code of {response.status_code} at {datetime.datetime.now()}"
+    if response.status_code < 500:
+        success = True
+        if not notify_always: exit()
+except Exception as e:
+    email_text = f"Request to {url} failed at {datetime.datetime.now()} with the following error:\n{e}"
 
 # Get email host config
 email_host = os.environ["EMAIL_HOST"]
@@ -37,7 +36,7 @@ email_host_user = os.environ["EMAIL_HOST_USER"]
 email_host_password = os.environ["EMAIL_HOST_PASSWORD"]
 
 # Send email
-email_text = f"{url} returned a status code of {response.status_code} at {datetime.datetime.now()}"
+email_subject = f"✅ {readable_url} is up" if success else f"❌ {readable_url} is down"
 sender_email = "http-up-check@phiture.com"
 message = MIMEMultipart()
 message["From"] = sender_email
